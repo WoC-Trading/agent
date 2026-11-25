@@ -651,19 +651,17 @@ class Site(Base):
             )
             region = auth.get("REGION")
 
+            client_kwargs = {
+                "aws_access_key_id": auth["ACCESS_KEY"],
+                "aws_secret_access_key": auth["SECRET_KEY"],
+            }
+
             if region:
-                s3 = boto3.client(
-                    "s3",
-                    aws_access_key_id=auth["ACCESS_KEY"],
-                    aws_secret_access_key=auth["SECRET_KEY"],
-                    region_name=region,
-                )
-            else:
-                s3 = boto3.client(
-                    "s3",
-                    aws_access_key_id=auth["ACCESS_KEY"],
-                    aws_secret_access_key=auth["SECRET_KEY"],
-                )
+                client_kwargs["region_name"] = region.strip()
+            if auth.get("ENDPOINT_URL"):
+                client_kwargs["endpoint_url"] = auth["ENDPOINT_URL"].strip()
+
+            s3 = boto3.client("s3", **client_kwargs)
 
             for backup_file in backup_files.values():
                 file_name = backup_file["file"].split(os.sep)[-1]
@@ -1078,7 +1076,11 @@ print(">>>" + frappe.session.sid + "<<<")
                 providers = {
                     "AWS S3": ("AWS", f"s3.{auth['REGION']}.amazonaws.com"),
                 }
-                rclone_provider, endpoint = providers[auth["PROVIDER"]]
+                endpoint_url = (auth.get("ENDPOINT_URL") or "").strip()
+                if endpoint_url:
+                    rclone_provider, endpoint = "Other", endpoint_url
+                else:
+                    rclone_provider, endpoint = providers[auth["PROVIDER"]]
                 s3_flags = [
                     "--s3-provider",
                     rclone_provider,
